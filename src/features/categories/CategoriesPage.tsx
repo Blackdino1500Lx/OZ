@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/features/auth/AuthContext';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from './hooks';
 import { CategoryForm } from './CategoryForm';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { type Category } from '@/types/database';
 
 const DEFAULT_CATEGORIES = [
@@ -13,7 +12,6 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export function CategoriesPage() {
-  const { user } = useAuth();
   const { data: categories, isLoading } = useCategories();
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
@@ -23,7 +21,6 @@ export function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hasSeeded, setHasSeeded] = useState(false);
 
-  // Seed initial categories on first login
   useEffect(() => {
     if (!isLoading && categories && categories.length === 0 && !hasSeeded && !createMutation.isPending) {
       setHasSeeded(true);

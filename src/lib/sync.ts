@@ -1,12 +1,13 @@
 import { supabase } from './supabase';
 import { db } from './db';
+import type { Item, Category, ItemNote } from '@/types/database';
 
 let isSyncing = false;
 
 export async function processSyncQueue(): Promise<void> {
   if (isSyncing || !navigator.onLine) return;
   
-  isSyncing = true; // Lo ponemos en true acá
+  isSyncing = true;
   try {
     let currentUserId = null;
     try {
@@ -26,7 +27,7 @@ export async function processSyncQueue(): Promise<void> {
     
     for (const task of queue) {
       try {
-        const payload = { ...task.payload, user_id: currentUserId };
+        const payload = { ...task.payload, user_id: currentUserId } as Record<string, unknown>;
 
         if (task.table === 'items') {
           if (task.action === 'INSERT' || task.action === 'UPDATE') {
@@ -36,11 +37,12 @@ export async function processSyncQueue(): Promise<void> {
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {
               console.log(`Conflicto en item ${task.recordId}: remoto más reciente.`);
             } else {
-              const { error } = await supabase.from('items').upsert(payload);
+              const { error } = await supabase.from('items').upsert(payload as unknown as Item);
               if (error) throw error;
             }
           } else if (task.action === 'DELETE') {
-            await supabase.from('items').update({ deleted_at: payload.deleted_at }).eq('id', task.recordId);
+            const { error } = await supabase.from('items').update({ deleted_at: payload.deleted_at as string }).eq('id', task.recordId);
+            if (error) throw error;
           }
         }
 
@@ -52,11 +54,12 @@ export async function processSyncQueue(): Promise<void> {
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {
               console.log(`Conflicto en categoría ${task.recordId}: remoto más reciente.`);
             } else {
-              const { error } = await supabase.from('categories').upsert(payload);
+              const { error } = await supabase.from('categories').upsert(payload as unknown as Category);
               if (error) throw error;
             }
           } else if (task.action === 'DELETE') {
-            await supabase.from('categories').update({ deleted_at: payload.deleted_at }).eq('id', task.recordId);
+            const { error } = await supabase.from('categories').update({ deleted_at: payload.deleted_at as string }).eq('id', task.recordId);
+            if (error) throw error;
           }
         }
 
@@ -68,11 +71,12 @@ export async function processSyncQueue(): Promise<void> {
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {
               console.log(`Conflicto en nota ${task.recordId}: remoto más reciente.`);
             } else {
-              const { error } = await supabase.from('item_notes').upsert(payload);
+              const { error } = await supabase.from('item_notes').upsert(payload as unknown as ItemNote);
               if (error) throw error;
             }
           } else if (task.action === 'DELETE') {
-            await supabase.from('item_notes').update({ deleted_at: payload.deleted_at }).eq('id', task.recordId);
+            const { error } = await supabase.from('item_notes').update({ deleted_at: payload.deleted_at as string }).eq('id', task.recordId);
+            if (error) throw error;
           }
         }
 
@@ -83,7 +87,7 @@ export async function processSyncQueue(): Promise<void> {
       }
     }
   } finally {
-    isSyncing = false; // SIEMPRE se libera el candado
+    isSyncing = false;
   }
 }
 

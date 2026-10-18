@@ -48,7 +48,7 @@ export async function createCategory(name: string, color: string, sortOrder: num
     table: 'categories',
     action: 'INSERT',
     recordId: newCat.id,
-    payload: newCat,
+    payload: newCat as unknown as Record<string, unknown>,
     createdAt: Date.now(),
   });
 

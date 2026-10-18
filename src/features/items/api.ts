@@ -87,7 +87,7 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
       table: 'items',
       action: 'INSERT',
       recordId: newItem.id,
-      payload: newItem,
+      payload: newItem as unknown as Record<string, unknown>,
       createdAt: Date.now(),
     });
   } catch (err) {

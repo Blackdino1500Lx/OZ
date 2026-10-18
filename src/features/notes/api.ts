@@ -51,7 +51,7 @@ export async function createNote(itemId: string, body: string): Promise<ItemNote
     table: 'item_notes',
     action: 'INSERT',
     recordId: newNote.id,
-    payload: newNote,
+    payload: newNote as unknown as Record<string, unknown>,
     createdAt: Date.now(),
   });
 
