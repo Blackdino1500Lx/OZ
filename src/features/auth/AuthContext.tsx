@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { processSyncQueue } from '@/lib/sync'; // <-- IMPORTAMOS ESTO
 
 interface AuthContextType {
   session: Session | null;
@@ -23,20 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Get initial session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      // Si ya había una sesión guardada, intentamos sincronizar
+      if (session) void processSyncQueue();
     });
 
-    // 2. Listen for auth changes (login, logout, token refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      // Si el usuario se acaba de loguear, disparamos la sincronización
+      if (session) void processSyncQueue();
     });
 
     return () => subscription.unsubscribe();
