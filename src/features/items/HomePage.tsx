@@ -4,7 +4,7 @@ import { useItems } from './hooks';
 import { ItemCard } from './ItemCard';
 import { ItemForm } from './ItemForm';
 import { Button } from '@/components/ui/button';
-import { startOfDay, endOfDay, isToday, isBefore } from 'date-fns';
+import { startOfDay, isToday, isBefore } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type ItemWithCategory } from './api';
 
