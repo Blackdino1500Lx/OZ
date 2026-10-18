@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Organizador">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="134" fill="none" stroke="#f1f5f9" stroke-width="26"/>
+  <line x1="256" y1="256" x2="256" y2="170" stroke="#f1f5f9" stroke-width="26" stroke-linecap="round"/>
+  <line x1="256" y1="256" x2="320" y2="288" stroke="#f1f5f9" stroke-width="26" stroke-linecap="round"/>
+</svg>
