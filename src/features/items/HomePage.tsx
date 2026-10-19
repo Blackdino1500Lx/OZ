@@ -4,7 +4,7 @@ import { useItems } from './hooks';
 import { ItemCard } from './ItemCard';
 import { ItemForm } from './ItemForm';
 import { Button } from '@/components/ui/button';
-import { startOfDay, isToday, isBefore } from 'date-fns';
+import { startOfDay, isToday, isBefore, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { type ItemWithCategory } from './api';
 
@@ -26,13 +26,20 @@ export function HomePage() {
   const morning: ItemWithCategory[] = [];
   const afternoon: ItemWithCategory[] = [];
   const evening: ItemWithCategory[] = [];
-  const noDate: ItemWithCategory[] = [];
+  const noTimeToday: ItemWithCategory[] = []; // Sin hora, pero creados HOY
+  const noDate: ItemWithCategory[] = [];       // Sin hora, creados ANTES
 
   (items || []).forEach((item) => {
     if (item.status === 'hecho' || item.status === 'cancelado') return;
 
     if (!item.starts_at) {
-      noDate.push(item);
+      const createdZoned = toZonedTime(new Date(item.created_at), TIMEZONE);
+      // Regla del SPEC: sin fecha + creado hoy -> aparece en Hoy. Si no, va a "Sin fecha"
+      if (isSameDay(createdZoned, nowZoned)) {
+        noTimeToday.push(item);
+      } else {
+        noDate.push(item);
+      }
       return;
     }
 
@@ -83,9 +90,10 @@ export function HomePage() {
         {renderSection('Mañana', morning)}
         {renderSection('Tarde', afternoon)}
         {renderSection('Noche', evening)}
+        {renderSection('Sin hora (creados hoy)', noTimeToday)} {/* <-- NUEVA SECCIÓN */}
         {renderSection('Sin fecha', noDate)}
 
-        {overdue.length === 0 && morning.length === 0 && afternoon.length === 0 && evening.length === 0 && noDate.length === 0 && !isFormOpen && (
+        {overdue.length === 0 && morning.length === 0 && afternoon.length === 0 && evening.length === 0 && noTimeToday.length === 0 && noDate.length === 0 && !isFormOpen && (
           <div className="text-center py-12 border rounded-lg bg-card/50">
             <p className="text-muted-foreground">No hay nada pendiente para hoy.</p>
             <Button variant="link" onClick={() => setIsFormOpen(true)}>Crear mi primer ítem</Button>

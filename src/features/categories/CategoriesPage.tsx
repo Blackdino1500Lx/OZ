@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from './hooks';
+import { useItems } from '@/features/items/hooks'; // <-- IMPORTAMOS ITEMS
 import { CategoryForm } from './CategoryForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +14,7 @@ const DEFAULT_CATEGORIES = [
 
 export function CategoriesPage() {
   const { data: categories, isLoading } = useCategories();
+  const { data: items } = useItems(); // <-- TRAEMOS LOS ITEMS
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
   const deleteMutation = useDeleteCategory();
@@ -56,6 +58,18 @@ export function CategoriesPage() {
       const next = categories[index + 1];
       updateMutation.mutate({ id: category.id, updates: { sort_order: next.sort_order } });
       updateMutation.mutate({ id: next.id, updates: { sort_order: category.sort_order } });
+    }
+  };
+
+  // NUEVA FUNCIÓN DE BORRADO CON VALIDACIÓN
+  const handleDelete = (category: Category) => {
+    const hasItems = items?.some((item) => item.category_id === category.id);
+    if (hasItems) {
+      alert(`No podés eliminar la categoría "${category.name}" porque tiene ítems asignados.\n\nReasigná esos ítems a otra categoría o eliminalos primero.`);
+      return;
+    }
+    if (confirm(`¿Eliminar la categoría "${category.name}"?`)) {
+      deleteMutation.mutate(category.id);
     }
   };
 
@@ -123,11 +137,7 @@ export function CategoriesPage() {
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar la categoría "${category.name}"?`)) {
-                          deleteMutation.mutate(category.id);
-                        }
-                      }}
+                      onClick={() => handleDelete(category)}
                       disabled={deleteMutation.isPending}
                     >
                       Borrar
