@@ -4,14 +4,10 @@
  * Will be replaced by `supabase gen types` output in a later phase.
  */
 
-// ---- Enums / constrained string unions (from CHECK constraints) ----
-
 export type ItemKind = 'tarea' | 'evento' | 'pago' | 'recordatorio';
 export type ItemStatus = 'pendiente' | 'en_curso' | 'hecho' | 'cancelado';
 export type ItemOrigin = 'manual' | 'imagen';
 export type ItemPriority = 0 | 1 | 2;
-
-// ---- Row types (as returned by SELECT) ----
 
 export interface Category {
   id: string;
