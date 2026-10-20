@@ -21,24 +21,41 @@ export function ItemForm({ initialData, onCancel }: ItemFormProps) {
 
   const [title, setTitle] = useState(initialData?.title || '');
   const [categoryId, setCategoryId] = useState(initialData?.category_id || categories?.[0]?.id || '');
-  const [startsAt, setStartsAt] = useState(
-    initialData?.starts_at ? new Date(initialData.starts_at).toISOString().slice(0, 16) : ''
-  );
   const [description, setDescription] = useState(initialData?.description || '');
   const [kind, setKind] = useState<ItemKind>(initialData?.kind || 'tarea');
   const [priority, setPriority] = useState<ItemPriority>((initialData?.priority as ItemPriority) || 0);
+  
+  // Nuevos estados
+  const [allDay, setAllDay] = useState(initialData?.all_day || false);
+  const [startsAt, setStartsAt] = useState(
+    initialData?.starts_at ? new Date(initialData.starts_at).toISOString().slice(0, 16) : ''
+  );
+  const [recurrence, setRecurrence] = useState(initialData?.recurrence_rule || '');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !categoryId) return;
 
+    // Si es "Todo el día", forzamos la hora a las 12:00 para evitar problemas de zona horaria
+    let isoDate = null;
+    if (startsAt) {
+      if (allDay) {
+        const datePart = startsAt.split('T')[0];
+        isoDate = new Date(`${datePart}T12:00:00`).toISOString();
+      } else {
+        isoDate = new Date(startsAt).toISOString();
+      }
+    }
+
     const payload = {
       title: title.trim(),
       category_id: categoryId,
-      starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+      starts_at: isoDate,
       description: description.trim() || null,
       kind,
       priority,
+      all_day: allDay,
+      recurrence_rule: recurrence || null,
     };
 
     if (initialData) {
@@ -77,7 +94,7 @@ export function ItemForm({ initialData, onCancel }: ItemFormProps) {
                 id="category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 required
               >
                 <option value="" disabled>Seleccionar...</option>
@@ -86,12 +103,25 @@ export function ItemForm({ initialData, onCancel }: ItemFormProps) {
                 ))}
               </select>
             </div>
+
+            {/* Fecha y hora con opción de Todo el día */}
             <div className="space-y-2">
-              <Label htmlFor="starts_at">Fecha y hora</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="starts_at">{allDay ? 'Fecha' : 'Fecha y hora'}</Label>
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={allDay} 
+                    onChange={(e) => setAllDay(e.target.checked)} 
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  Todo el día
+                </label>
+              </div>
               <Input
                 id="starts_at"
-                type="datetime-local"
-                value={startsAt}
+                type={allDay ? "date" : "datetime-local"}
+                value={allDay && startsAt ? startsAt.split('T')[0] : startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
               />
             </div>
@@ -143,6 +173,24 @@ export function ItemForm({ initialData, onCancel }: ItemFormProps) {
                     <option value={2}>Alta (2)</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Recurrencia */}
+              <div className="space-y-2">
+                <Label htmlFor="recurrence">Repetición</Label>
+                <select
+                  id="recurrence"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">No se repite</option>
+                  <option value="FREQ=DAILY">Diario</option>
+                  <option value="FREQ=WEEKLY">Semanal</option>
+                  <option value="FREQ=WEEKLY;INTERVAL=2">Quincenal</option>
+                  <option value="FREQ=MONTHLY">Mensual</option>
+                  <option value="FREQ=YEARLY">Anual</option>
+                </select>
               </div>
             </div>
           </details>

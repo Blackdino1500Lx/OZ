@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from './hooks';
-import { useItems } from '@/features/items/hooks'; // <-- IMPORTAMOS ITEMS
+import { 
+  useCategories, 
+  useCreateCategory, 
+  useUpdateCategory, 
+  useDeleteCategory, 
+  useSwapCategories 
+} from './hooks';
+import { useItems } from '@/features/items/hooks';
 import { CategoryForm } from './CategoryForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,15 +20,18 @@ const DEFAULT_CATEGORIES = [
 
 export function CategoriesPage() {
   const { data: categories, isLoading } = useCategories();
-  const { data: items } = useItems(); // <-- TRAEMOS LOS ITEMS
+  const { data: items } = useItems(); // Traemos los ítems para validar el borrado
+  
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
   const deleteMutation = useDeleteCategory();
+  const swapMutation = useSwapCategories(); // Hook para el intercambio de orden
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hasSeeded, setHasSeeded] = useState(false);
 
+  // Crear categorías por defecto en el primer ingreso
   useEffect(() => {
     if (!isLoading && categories && categories.length === 0 && !hasSeeded && !createMutation.isPending) {
       setHasSeeded(true);
@@ -47,27 +56,35 @@ export function CategoriesPage() {
     );
   };
 
+  // Arreglo del bug: usamos swapMutation para hacer el intercambio en un solo paso
   const moveCategory = (category: Category, direction: 'up' | 'down') => {
     if (!categories) return;
     const index = categories.findIndex((c) => c.id === category.id);
+    
     if (direction === 'up' && index > 0) {
       const prev = categories[index - 1];
-      updateMutation.mutate({ id: category.id, updates: { sort_order: prev.sort_order } });
-      updateMutation.mutate({ id: prev.id, updates: { sort_order: category.sort_order } });
+      swapMutation.mutate({
+        id1: category.id, order1: prev.sort_order,
+        id2: prev.id, order2: category.sort_order
+      });
     } else if (direction === 'down' && index < categories.length - 1) {
       const next = categories[index + 1];
-      updateMutation.mutate({ id: category.id, updates: { sort_order: next.sort_order } });
-      updateMutation.mutate({ id: next.id, updates: { sort_order: category.sort_order } });
+      swapMutation.mutate({
+        id1: category.id, order1: next.sort_order,
+        id2: next.id, order2: category.sort_order
+      });
     }
   };
 
-  // NUEVA FUNCIÓN DE BORRADO CON VALIDACIÓN
+  // Validación para no borrar categorías con ítems asociados
   const handleDelete = (category: Category) => {
     const hasItems = items?.some((item) => item.category_id === category.id);
+    
     if (hasItems) {
       alert(`No podés eliminar la categoría "${category.name}" porque tiene ítems asignados.\n\nReasigná esos ítems a otra categoría o eliminalos primero.`);
       return;
     }
+    
     if (confirm(`¿Eliminar la categoría "${category.name}"?`)) {
       deleteMutation.mutate(category.id);
     }
@@ -117,16 +134,18 @@ export function CategoriesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      disabled={index === 0}
+                      disabled={index === 0 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'up')}
+                      title="Subir"
                     >
                       ↑
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      disabled={index === (categories?.length ?? 0) - 1}
+                      disabled={index === (categories?.length ?? 0) - 1 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'down')}
+                      title="Bajar"
                     >
                       ↓
                     </Button>
@@ -148,6 +167,7 @@ export function CategoriesPage() {
             )}
           </div>
         ))}
+        
         {categories?.length === 0 && !isCreating && (
           <p className="text-center text-muted-foreground py-8">
             No hay categorías. Creá una para empezar.

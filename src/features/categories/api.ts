@@ -74,6 +74,23 @@ export async function updateCategory(id: string, updates: Partial<Category>): Pr
   void processSyncQueue();
   return updated;
 }
+export async function swapCategoriesOrder(id1: string, order1: number, id2: string, order2: number): Promise<void> {
+  const now = new Date().toISOString();
+  const cat1 = await db.categories.get(id1);
+  const cat2 = await db.categories.get(id2);
+  if (!cat1 || !cat2) return;
+
+  const updated1 = { ...cat1, sort_order: order1, updated_at: now };
+  const updated2 = { ...cat2, sort_order: order2, updated_at: now };
+
+  await db.categories.bulkPut([updated1, updated2]);
+  await db.sync_queue.bulkAdd([
+    { table: 'categories', action: 'UPDATE', recordId: id1, payload: updated1, createdAt: Date.now() },
+    { table: 'categories', action: 'UPDATE', recordId: id2, payload: updated2, createdAt: Date.now() },
+  ]);
+
+  void processSyncQueue();
+}
 
 export async function softDeleteCategory(id: string): Promise<void> {
   const existing = await db.categories.get(id);

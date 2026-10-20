@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PersistentBanner } from './PersistentBanner';
 
 export function AppLayout() {
   const { signOut } = useAuth();
@@ -31,11 +32,13 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Banner de modo Offline */}
       {isOffline && (
         <div className="bg-amber-500 text-amber-950 text-xs font-medium text-center py-1 px-4">
           Estás sin conexión. Los cambios se guardarán localmente y se sincronizarán al volver.
         </div>
       )}
+
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <nav className="flex items-center gap-4 sm:gap-6 overflow-x-auto">
@@ -58,6 +61,10 @@ export function AppLayout() {
           </Button>
         </div>
       </header>
+
+      {/* Banner Persistente para tareas críticas */}
+      <PersistentBanner />
+
       <main className="flex-1 container mx-auto p-4 md:p-8 max-w-3xl">
         <Outlet />
       </main>
