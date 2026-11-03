@@ -24,7 +24,7 @@ export function AttachmentsList({ itemId }: { itemId: string }) {
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      uploadMutation.mutate(file, {
+      uploadMutation.mutate({file}, {
         onSuccess: () => {
           if (fileInputRef.current) fileInputRef.current.value = '';
         },
