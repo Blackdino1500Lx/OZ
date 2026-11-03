@@ -18,16 +18,17 @@ export async function processSyncQueue(): Promise<void> {
       return;
     }
 
-    if (!currentUserId) {
-      console.warn('No hay sesión activa. Sincronización pausada.');
-      return;
-    }
+    if (!currentUserId) return;
 
     const queue = await db.sync_queue.orderBy('createdAt').toArray();
     
     for (const task of queue) {
       try {
-        const payload = { ...task.payload, user_id: currentUserId } as Record<string, unknown>;
+        // Solo inyectamos el user_id si es una tarea nueva (Placeholder)
+        const payload = { ...task.payload };
+        if (payload.user_id === '00000000-0000-0000-0000-000000000000' || task.action === 'INSERT') {
+          payload.user_id = currentUserId;
+        }
 
         if (task.table === 'items') {
           if (task.action === 'INSERT' || task.action === 'UPDATE') {

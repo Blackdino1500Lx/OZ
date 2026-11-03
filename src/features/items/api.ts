@@ -27,7 +27,12 @@ export async function fetchItems(): Promise<ItemWithCategory[]> {
         supabase.from('items').select('*, categories(name, color), item_notes(body)').is('deleted_at', null)
       );
 
-      if (!error && data) {
+      if (error) {
+        console.error("Supabase Error (Items):", error);
+        throw error;
+      }
+      
+      if (data) {
         const items = data as unknown as ItemWithCategory[];
         await db.items.bulkPut(items.map(({ categories, item_notes, ...item }) => item));
       }
@@ -74,18 +79,10 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
     google_event_id: null,
   } as Item;
 
-  // 1. Sincronizar con Google Calendar (si está online y tiene fecha)
-  if (newItem.starts_at) {
-    const googleEventId = await syncWithGoogleCalendar('upsert', newItem);
-    if (googleEventId) {
-      newItem.google_event_id = googleEventId;
-    }
-  }
-
-  // 2. Guardar en IndexedDB
+  // 1. Guardar en IndexedDB PRIMERO (UI instantánea)
   await db.items.put(newItem);
   
-  // 3. Encolar para Supabase
+  // 2. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'INSERT',
@@ -93,8 +90,24 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
     payload: newItem as unknown as Record<string, unknown>,
     createdAt: Date.now(),
   });
-
+  
   void processSyncQueue();
+
+  // 3. Sincronizar con Google Calendar EN SEGUNDO PLANO
+  if (newItem.starts_at) {
+    syncWithGoogleCalendar('upsert', newItem).then(async (googleEventId) => {
+      if (googleEventId) {
+        const updated = { ...newItem, google_event_id: googleEventId };
+        await db.items.put(updated);
+        await db.sync_queue.add({ 
+          table: 'items', action: 'UPDATE', recordId: updated.id, 
+          payload: updated as unknown as Record<string, unknown>, createdAt: Date.now() 
+        });
+        void processSyncQueue();
+      }
+    });
+  }
+
   return newItem;
 }
 
@@ -104,7 +117,20 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
 
   const updatedItem = { ...existing, ...updates, updated_at: new Date().toISOString() };
 
-  // --- MOTOR DE RECURRENCIA ---
+  // 1. Guardar en IndexedDB PRIMERO
+  await db.items.put(updatedItem);
+  
+  // 2. Encolar para Supabase
+  await db.sync_queue.add({
+    table: 'items',
+    action: 'UPDATE',
+    recordId: id,
+    payload: updatedItem as unknown as Record<string, unknown>,
+    createdAt: Date.now(),
+  });
+  void processSyncQueue();
+
+  // 3. Manejo de Recurrencia
   const isBecomingDone = updates.status === 'hecho' && existing.status !== 'hecho';
   if (isBecomingDone && existing.recurrence_rule && existing.starts_at) {
     let nextDate = new Date(existing.starts_at);
@@ -116,57 +142,55 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
     else if (rule.includes('FREQ=MONTHLY')) nextDate.setMonth(nextDate.getMonth() + 1);
     else if (rule.includes('FREQ=YEARLY')) nextDate.setFullYear(nextDate.getFullYear() + 1);
 
-    // Creamos la nueva instancia para la próxima semana/mes
     const nextItem = {
-      ...existing,
-      id: crypto.randomUUID(),
+      ...existing, 
+      id: crypto.randomUUID(), 
       starts_at: nextDate.toISOString(),
-      status: 'pendiente',
-      completed_at: null,
-      google_event_id: null, // <-- El nuevo evento tendrá su propio ID
-      created_at: new Date().toISOString(),
+      status: 'pendiente', 
+      completed_at: null, 
+      google_event_id: null,
+      created_at: new Date().toISOString(), 
       updated_at: new Date().toISOString(),
     } as Item;
 
-    // Sincronizamos el futuro evento con Google
-    if (nextItem.starts_at) {
-      const googleEventId = await syncWithGoogleCalendar('upsert', nextItem);
-      if (googleEventId) nextItem.google_event_id = googleEventId;
-    }
-
     await db.items.put(nextItem);
     await db.sync_queue.add({
-      table: 'items',
-      action: 'INSERT',
-      recordId: nextItem.id,
-      payload: nextItem as unknown as Record<string, unknown>,
-      createdAt: Date.now(),
+      table: 'items', action: 'INSERT', recordId: nextItem.id,
+      payload: nextItem as unknown as Record<string, unknown>, createdAt: Date.now(),
     });
-  }
-  // ----------------------------
+    void processSyncQueue();
 
-  // 1. Sincronizar el ítem actual con Google Calendar
-  if (updatedItem.starts_at) {
-    const googleEventId = await syncWithGoogleCalendar('upsert', updatedItem);
-    // Si Google nos devuelve un ID y no lo teníamos, lo guardamos
-    if (googleEventId && !updatedItem.google_event_id) {
-      updatedItem.google_event_id = googleEventId;
+    // Sincronizar la nueva tarea futura con Google en background
+    if (nextItem.starts_at) {
+      syncWithGoogleCalendar('upsert', nextItem).then(async (googleEventId) => {
+        if (googleEventId) {
+          const updatedNext = { ...nextItem, google_event_id: googleEventId };
+          await db.items.put(updatedNext);
+          await db.sync_queue.add({ 
+            table: 'items', action: 'UPDATE', recordId: updatedNext.id, 
+            payload: updatedNext as unknown as Record<string, unknown>, createdAt: Date.now() 
+          });
+          void processSyncQueue();
+        }
+      });
     }
   }
 
-  // 2. Guardar local
-  await db.items.put(updatedItem);
-  
-  // 3. Encolar para Supabase
-  await db.sync_queue.add({
-    table: 'items',
-    action: 'UPDATE',
-    recordId: id,
-    payload: updatedItem as unknown as Record<string, unknown>,
-    createdAt: Date.now(),
-  });
+  // 4. Sincronizar el ítem actual con Google Calendar en background
+  if (updatedItem.starts_at) {
+    syncWithGoogleCalendar('upsert', updatedItem).then(async (googleEventId) => {
+      if (googleEventId && !updatedItem.google_event_id) {
+        const updated = { ...updatedItem, google_event_id: googleEventId };
+        await db.items.put(updated);
+        await db.sync_queue.add({ 
+          table: 'items', action: 'UPDATE', recordId: updated.id, 
+          payload: updated as unknown as Record<string, unknown>, createdAt: Date.now() 
+        });
+        void processSyncQueue();
+      }
+    });
+  }
 
-  void processSyncQueue();
   return updatedItem;
 }
 
@@ -186,20 +210,15 @@ export async function softDeleteItem(id: string): Promise<void> {
   const existing = await db.items.get(id);
   if (!existing) return;
 
-  // 1. Borrar de Google Calendar
-  if (existing.google_event_id) {
-    await syncWithGoogleCalendar('delete', existing);
-  }
-
-  // 2. Soft delete local
+  // 1. Guardar en IndexedDB PRIMERO (Borrado lógico local)
   const updated = { 
     ...existing, 
     deleted_at: new Date().toISOString(), 
     updated_at: new Date().toISOString() 
   };
   await db.items.put(updated);
-
-  // 3. Encolar para Supabase
+  
+  // 2. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'DELETE',
@@ -210,6 +229,11 @@ export async function softDeleteItem(id: string): Promise<void> {
     },
     createdAt: Date.now(),
   });
-
+  
   void processSyncQueue();
+
+  // 3. Borrar de Google Calendar en background
+  if (existing.google_event_id) {
+    void syncWithGoogleCalendar('delete', existing);
+  }
 }
