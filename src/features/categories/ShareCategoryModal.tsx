@@ -43,7 +43,7 @@ export function ShareCategoryModal({ category, isOpen, onClose }: ShareCategoryM
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="w-[90vw] sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="w-5 h-5" /> Compartir "{category.name}"

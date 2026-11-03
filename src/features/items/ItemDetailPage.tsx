@@ -59,7 +59,7 @@ export function ItemDetailPage() {
           <div className="space-y-3 flex-1">
             <div className="flex items-center gap-3">
               <h1 className={cn(
-                "text-2xl font-bold tracking-tight",
+                "text-2xl font-bold tracking-tight break-words",
                 (isDone || isCanceled) && "line-through text-muted-foreground"
               )}>
                 {item.title}
@@ -116,7 +116,7 @@ export function ItemDetailPage() {
         </div>
 
         {item.description && (
-          <div className="mt-6 ml-2 text-sm whitespace-pre-wrap text-foreground/80 bg-muted/30 p-3 rounded-md">
+          <div className="mt-6 ml-2 text-sm whitespace-pre-wrap break-words text-foreground/80 bg-muted/30 p-3 rounded-md">
             {item.description}
           </div>
         )}

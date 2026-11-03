@@ -8,11 +8,11 @@ import {
 } from './hooks';
 import { useItems } from '@/features/items/hooks';
 import { CategoryForm } from './CategoryForm';
-import { ShareCategoryModal } from './ShareCategoryModal'; // <-- NUEVO
+import { ShareCategoryModal } from './ShareCategoryModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { type Category } from '@/types/database';
-import { Share2 } from 'lucide-react'; // <-- NUEVO
+import { Share2, Pencil, Trash2, ArrowUp, ArrowDown } from 'lucide-react'; // <-- Nuevos iconos
 
 const DEFAULT_CATEGORIES = [
   { name: 'Trabajo', color: '#3B82F6', sort_order: 1 },
@@ -32,8 +32,6 @@ export function CategoriesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hasSeeded, setHasSeeded] = useState(false);
-  
-  // Estado para el modal de compartir
   const [sharingCategory, setSharingCategory] = useState<Category | null>(null);
 
   useEffect(() => {
@@ -125,20 +123,23 @@ export function CategoriesPage() {
               />
             ) : (
               <Card>
-                <CardContent className="flex items-center gap-4 p-4">
+                {/* Agregamos min-w-0 para permitir que el texto interno se encoja */}
+                <CardContent className="flex items-center gap-3 p-3 sm:p-4 min-w-0">
                   <div
                     className="w-4 h-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: category.color }}
                   />
-                  <span className="flex-1 font-medium">{category.name}</span>
+                  {/* truncate para que el nombre no desborde */}
+                  <span className="flex-1 font-medium truncate min-w-0">{category.name}</span>
                   
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    {/* Botón de Compartir */}
+                  {/* Contenedor de botones fijo */}
+                  <div className="flex items-center gap-0.5 sm:gap-1 text-muted-foreground flex-shrink-0">
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => setSharingCategory(category)}
-                      title="Compartir categoría"
+                      title="Compartir"
                     >
                       <Share2 className="w-4 h-4" />
                     </Button>
@@ -146,30 +147,39 @@ export function CategoriesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       disabled={index === 0 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'up')}
                     >
-                      ↑
+                      <ArrowUp className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       disabled={index === (categories?.length ?? 0) - 1 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'down')}
                     >
-                      ↓
+                      <ArrowDown className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditingId(category.id)}>
-                      Editar
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEditingId(category.id)}
+                      title="Editar"
+                    >
+                      <Pencil className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
                       onClick={() => handleDelete(category)}
                       disabled={deleteMutation.isPending}
+                      title="Borrar"
                     >
-                      Borrar
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -179,7 +189,6 @@ export function CategoriesPage() {
         ))}
       </div>
 
-      {/* Modal de compartir */}
       {sharingCategory && (
         <ShareCategoryModal
           category={sharingCategory}

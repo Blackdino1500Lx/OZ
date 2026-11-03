@@ -91,7 +91,7 @@ export function NotesList({ itemId }: { itemId: string }) {
                     </button>
                   </div>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{note.body}</p>
+                <p className="text-sm whitespace-pre-wrap break-words">{note.body}</p>
                 
                 {/* COMPONENTE DE ADJUNTOS DE LA NOTA */}
                 <NoteAttachments itemId={itemId} noteId={note.id} />
