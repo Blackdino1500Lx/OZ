@@ -18,8 +18,18 @@ export async function fetchCategories(): Promise<Category[]> {
       const { data, error } = await fetchWithTimeout(
         supabase.from('categories').select('*').is('deleted_at', null)
       );
+      
       if (!error && data) {
-        await db.categories.bulkPut(data as Category[]);
+        const categories = data as Category[];
+        
+        // PROTECCIÓN OFFLINE
+        const pendingTasks = await db.sync_queue.where('table').equals('categories').toArray();
+        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
+        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+
+        const safeCategories = categories.filter(c => !pendingDeleteIds.has(c.id) && !pendingUpdateIds.has(c.id));
+        
+        await db.categories.bulkPut(safeCategories);
       }
     } catch (err) {
       console.warn('Fetch categorías falló...', err);

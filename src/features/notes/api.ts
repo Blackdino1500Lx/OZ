@@ -18,8 +18,18 @@ export async function fetchNotes(itemId: string): Promise<ItemNote[]> {
       const { data, error } = await fetchWithTimeout(
         supabase.from('item_notes').select('*').eq('item_id', itemId).is('deleted_at', null)
       );
+      
       if (!error && data) {
-        await db.item_notes.bulkPut(data as ItemNote[]);
+        const notes = data as ItemNote[];
+        
+        // PROTECCIÓN OFFLINE
+        const pendingTasks = await db.sync_queue.where('table').equals('item_notes').toArray();
+        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
+        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+
+        const safeNotes = notes.filter(n => !pendingDeleteIds.has(n.id) && !pendingUpdateIds.has(n.id));
+        
+        await db.item_notes.bulkPut(safeNotes);
       }
     } catch (err) {
       console.warn('Fetch notas falló...', err);

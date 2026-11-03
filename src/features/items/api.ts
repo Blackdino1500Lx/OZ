@@ -34,7 +34,15 @@ export async function fetchItems(): Promise<ItemWithCategory[]> {
       
       if (data) {
         const items = data as unknown as ItemWithCategory[];
-        await db.items.bulkPut(items.map(({ categories, item_notes, ...item }) => item));
+        
+        // PROTECCIÓN OFFLINE: No sobreescribir ítems que están pendientes en la cola
+        const pendingTasks = await db.sync_queue.where('table').equals('items').toArray();
+        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
+        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+
+        const safeItems = items.filter(i => !pendingDeleteIds.has(i.id) && !pendingUpdateIds.has(i.id));
+        
+        await db.items.bulkPut(safeItems.map(({ categories, item_notes, ...item }) => item));
       }
     } catch (err) {
       console.warn('Fetch red falló o tardó demasiado, usando caché local...', err);
