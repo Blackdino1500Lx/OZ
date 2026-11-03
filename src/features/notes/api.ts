@@ -22,14 +22,19 @@ export async function fetchNotes(itemId: string): Promise<ItemNote[]> {
       if (!error && data) {
         const notes = data as ItemNote[];
         
-        // PROTECCIÓN OFFLINE
         const pendingTasks = await db.sync_queue.where('table').equals('item_notes').toArray();
-        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
-        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+        const pendingIds = new Set(pendingTasks.map(t => t.recordId));
 
-        const safeNotes = notes.filter(n => !pendingDeleteIds.has(n.id) && !pendingUpdateIds.has(n.id));
-        
+        const safeNotes = notes.filter(n => !pendingIds.has(n.id));
         await db.item_notes.bulkPut(safeNotes);
+
+        const remoteIds = new Set(notes.map(n => n.id));
+        const localNotes = await db.item_notes.where('item_id').equals(itemId).toArray();
+        const notesToDelete = localNotes.filter(local => !remoteIds.has(local.id) && !pendingIds.has(local.id));
+
+        if (notesToDelete.length > 0) {
+          await db.item_notes.bulkDelete(notesToDelete.map(n => n.id));
+        }
       }
     } catch (err) {
       console.warn('Fetch notas falló...', err);
@@ -80,7 +85,7 @@ export async function updateNote(id: string, body: string): Promise<ItemNote> {
     table: 'item_notes',
     action: 'UPDATE',
     recordId: id,
-    payload: updated,
+    payload: updated as unknown as Record<string, unknown>,
     createdAt: Date.now(),
   });
 

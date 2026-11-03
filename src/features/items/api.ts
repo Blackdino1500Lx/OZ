@@ -35,14 +35,22 @@ export async function fetchItems(): Promise<ItemWithCategory[]> {
       if (data) {
         const items = data as unknown as ItemWithCategory[];
         
-        // PROTECCIÓN OFFLINE: No sobreescribir ítems que están pendientes en la cola
+        // 1. Obtener la cola de pendientes para no borrar cosas creadas offline
         const pendingTasks = await db.sync_queue.where('table').equals('items').toArray();
-        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
-        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+        const pendingIds = new Set(pendingTasks.map(t => t.recordId));
 
-        const safeItems = items.filter(i => !pendingDeleteIds.has(i.id) && !pendingUpdateIds.has(i.id));
-        
+        // 2. Guardar/Actualizar los que vienen del servidor
+        const safeItems = items.filter(i => !pendingIds.has(i.id));
         await db.items.bulkPut(safeItems.map(({ categories, item_notes, ...item }) => item));
+
+        // 3. ELIMINAR los locales que ya no existen en el servidor
+        const remoteIds = new Set(items.map(i => i.id));
+        const localItems = await db.items.toArray();
+        const itemsToDelete = localItems.filter(local => !remoteIds.has(local.id) && !pendingIds.has(local.id));
+        
+        if (itemsToDelete.length > 0) {
+          await db.items.bulkDelete(itemsToDelete.map(i => i.id));
+        }
       }
     } catch (err) {
       console.warn('Fetch red falló o tardó demasiado, usando caché local...', err);
@@ -87,10 +95,7 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
     google_event_id: null,
   } as Item;
 
-  // 1. Guardar en IndexedDB PRIMERO (UI instantánea)
   await db.items.put(newItem);
-  
-  // 2. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'INSERT',
@@ -101,7 +106,6 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
   
   void processSyncQueue();
 
-  // 3. Sincronizar con Google Calendar EN SEGUNDO PLANO
   if (newItem.starts_at) {
     syncWithGoogleCalendar('upsert', newItem).then(async (googleEventId) => {
       if (googleEventId) {
@@ -125,10 +129,7 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
 
   const updatedItem = { ...existing, ...updates, updated_at: new Date().toISOString() };
 
-  // 1. Guardar en IndexedDB PRIMERO
   await db.items.put(updatedItem);
-  
-  // 2. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'UPDATE',
@@ -138,7 +139,6 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
   });
   void processSyncQueue();
 
-  // 3. Manejo de Recurrencia
   const isBecomingDone = updates.status === 'hecho' && existing.status !== 'hecho';
   if (isBecomingDone && existing.recurrence_rule && existing.starts_at) {
     let nextDate = new Date(existing.starts_at);
@@ -168,7 +168,6 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
     });
     void processSyncQueue();
 
-    // Sincronizar la nueva tarea futura con Google en background
     if (nextItem.starts_at) {
       syncWithGoogleCalendar('upsert', nextItem).then(async (googleEventId) => {
         if (googleEventId) {
@@ -184,7 +183,6 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
     }
   }
 
-  // 4. Sincronizar el ítem actual con Google Calendar en background
   if (updatedItem.starts_at) {
     syncWithGoogleCalendar('upsert', updatedItem).then(async (googleEventId) => {
       if (googleEventId && !updatedItem.google_event_id) {
@@ -218,7 +216,6 @@ export async function softDeleteItem(id: string): Promise<void> {
   const existing = await db.items.get(id);
   if (!existing) return;
 
-  // 1. Guardar en IndexedDB PRIMERO (Borrado lógico local)
   const updated = { 
     ...existing, 
     deleted_at: new Date().toISOString(), 
@@ -226,7 +223,6 @@ export async function softDeleteItem(id: string): Promise<void> {
   };
   await db.items.put(updated);
   
-  // 2. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'DELETE',
@@ -240,7 +236,6 @@ export async function softDeleteItem(id: string): Promise<void> {
   
   void processSyncQueue();
 
-  // 3. Borrar de Google Calendar en background
   if (existing.google_event_id) {
     void syncWithGoogleCalendar('delete', existing);
   }

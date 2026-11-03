@@ -3,6 +3,12 @@ import { db } from '@/lib/db';
 import { processSyncQueue } from '@/lib/sync';
 import type { Category } from '@/types/database';
 
+export interface CategoryMember {
+  user_id: string;
+  email: string;
+  role: 'owner' | 'member';
+}
+
 const PLACEHOLDER_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 const fetchWithTimeout = async <T>(promise: PromiseLike<T>, timeoutMs = 5000): Promise<T> => {
@@ -22,14 +28,19 @@ export async function fetchCategories(): Promise<Category[]> {
       if (!error && data) {
         const categories = data as Category[];
         
-        // PROTECCIÓN OFFLINE
         const pendingTasks = await db.sync_queue.where('table').equals('categories').toArray();
-        const pendingDeleteIds = new Set(pendingTasks.filter(t => t.action === 'DELETE').map(t => t.recordId));
-        const pendingUpdateIds = new Set(pendingTasks.filter(t => t.action === 'UPDATE' || t.action === 'INSERT').map(t => t.recordId));
+        const pendingIds = new Set(pendingTasks.map(t => t.recordId));
 
-        const safeCategories = categories.filter(c => !pendingDeleteIds.has(c.id) && !pendingUpdateIds.has(c.id));
-        
+        const safeCategories = categories.filter(c => !pendingIds.has(c.id));
         await db.categories.bulkPut(safeCategories);
+
+        const remoteIds = new Set(categories.map(c => c.id));
+        const localCats = await db.categories.toArray();
+        const catsToDelete = localCats.filter(local => !remoteIds.has(local.id) && !pendingIds.has(local.id));
+
+        if (catsToDelete.length > 0) {
+          await db.categories.bulkDelete(catsToDelete.map(c => c.id));
+        }
       }
     } catch (err) {
       console.warn('Fetch categorías falló...', err);
@@ -77,29 +88,12 @@ export async function updateCategory(id: string, updates: Partial<Category>): Pr
     table: 'categories',
     action: 'UPDATE',
     recordId: id,
-    payload: updated,
+    payload: updated as unknown as Record<string, unknown>,
     createdAt: Date.now(),
   });
 
   void processSyncQueue();
   return updated;
-}
-export async function swapCategoriesOrder(id1: string, order1: number, id2: string, order2: number): Promise<void> {
-  const now = new Date().toISOString();
-  const cat1 = await db.categories.get(id1);
-  const cat2 = await db.categories.get(id2);
-  if (!cat1 || !cat2) return;
-
-  const updated1 = { ...cat1, sort_order: order1, updated_at: now };
-  const updated2 = { ...cat2, sort_order: order2, updated_at: now };
-
-  await db.categories.bulkPut([updated1, updated2]);
-  await db.sync_queue.bulkAdd([
-    { table: 'categories', action: 'UPDATE', recordId: id1, payload: updated1, createdAt: Date.now() },
-    { table: 'categories', action: 'UPDATE', recordId: id2, payload: updated2, createdAt: Date.now() },
-  ]);
-
-  void processSyncQueue();
 }
 
 export async function softDeleteCategory(id: string): Promise<void> {
@@ -119,17 +113,31 @@ export async function softDeleteCategory(id: string): Promise<void> {
 
   void processSyncQueue();
 }
+
+export async function swapCategoriesOrder(id1: string, order1: number, id2: string, order2: number): Promise<void> {
+  const now = new Date().toISOString();
+  const cat1 = await db.categories.get(id1);
+  const cat2 = await db.categories.get(id2);
+  if (!cat1 || !cat2) return;
+
+  const updated1 = { ...cat1, sort_order: order1, updated_at: now };
+  const updated2 = { ...cat2, sort_order: order2, updated_at: now };
+
+  await db.categories.bulkPut([updated1, updated2]);
+  await db.sync_queue.bulkAdd([
+    { table: 'categories', action: 'UPDATE', recordId: id1, payload: updated1 as unknown as Record<string, unknown>, createdAt: Date.now() },
+    { table: 'categories', action: 'UPDATE', recordId: id2, payload: updated2 as unknown as Record<string, unknown>, createdAt: Date.now() },
+  ]);
+
+  void processSyncQueue();
+}
+
 export async function inviteUserToCategory(categoryId: string, email: string): Promise<void> {
   const { error } = await supabase.rpc('invite_to_category', {
     cat_id: categoryId,
     invite_email: email,
   });
   if (error) throw new Error(error.message);
-}
-export interface CategoryMember {
-  user_id: string;
-  email: string;
-  role: 'owner' | 'member';
 }
 
 export async function fetchCategoryMembers(categoryId: string): Promise<CategoryMember[]> {
