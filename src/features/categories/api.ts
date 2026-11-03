@@ -116,3 +116,22 @@ export async function inviteUserToCategory(categoryId: string, email: string): P
   });
   if (error) throw new Error(error.message);
 }
+export interface CategoryMember {
+  user_id: string;
+  email: string;
+  role: 'owner' | 'member';
+}
+
+export async function fetchCategoryMembers(categoryId: string): Promise<CategoryMember[]> {
+  const { data, error } = await supabase.rpc('get_category_members', { cat_id: categoryId });
+  if (error) throw new Error(error.message);
+  return data as CategoryMember[];
+}
+
+export async function removeUserFromCategory(categoryId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_from_category', { 
+    cat_id: categoryId, 
+    target_user_id: userId 
+  });
+  if (error) throw new Error(error.message);
+}

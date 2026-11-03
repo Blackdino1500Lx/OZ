@@ -24,7 +24,6 @@ export async function processSyncQueue(): Promise<void> {
     
     for (const task of queue) {
       try {
-        // Solo inyectamos el user_id si es una tarea nueva (Placeholder)
         const payload = { ...task.payload };
         if (payload.user_id === '00000000-0000-0000-0000-000000000000' || task.action === 'INSERT') {
           payload.user_id = currentUserId;
@@ -32,7 +31,8 @@ export async function processSyncQueue(): Promise<void> {
 
         if (task.table === 'items') {
           if (task.action === 'INSERT' || task.action === 'UPDATE') {
-            const { data: remote } = await supabase.from('items').select('updated_at').eq('id', task.recordId).single();
+            // CAMBIO AQUÍ: usamos maybeSingle()
+            const { data: remote } = await supabase.from('items').select('updated_at').eq('id', task.recordId).maybeSingle();
             const localUpdatedAt = payload.updated_at as string;
             
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {
@@ -49,7 +49,8 @@ export async function processSyncQueue(): Promise<void> {
 
         if (task.table === 'categories') {
           if (task.action === 'INSERT' || task.action === 'UPDATE') {
-            const { data: remote } = await supabase.from('categories').select('updated_at').eq('id', task.recordId).single();
+            // CAMBIO AQUÍ: usamos maybeSingle()
+            const { data: remote } = await supabase.from('categories').select('updated_at').eq('id', task.recordId).maybeSingle();
             const localUpdatedAt = payload.updated_at as string;
             
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {
@@ -66,7 +67,8 @@ export async function processSyncQueue(): Promise<void> {
 
         if (task.table === 'item_notes') {
           if (task.action === 'INSERT' || task.action === 'UPDATE') {
-            const { data: remote } = await supabase.from('item_notes').select('updated_at').eq('id', task.recordId).single();
+            // CAMBIO AQUÍ: usamos maybeSingle()
+            const { data: remote } = await supabase.from('item_notes').select('updated_at').eq('id', task.recordId).maybeSingle();
             const localUpdatedAt = payload.updated_at as string;
             
             if (remote && new Date(remote.updated_at) > new Date(localUpdatedAt)) {

@@ -5,7 +5,9 @@ import {
   updateCategory, 
   softDeleteCategory, 
   swapCategoriesOrder,
-  inviteUserToCategory
+  inviteUserToCategory,
+  fetchCategoryMembers,
+  removeUserFromCategory
 } from './api';
 
 export function useCategories() {
@@ -67,6 +69,26 @@ export function useInviteToCategory() {
       inviteUserToCategory(categoryId, email),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
+      // Invalidamos también la lista de miembros para que se actualice en el modal
+      void queryClient.invalidateQueries({ queryKey: ['category_members'] });
+    },
+  });
+}
+
+export function useCategoryMembers(categoryId: string | null) {
+  return useQuery({
+    queryKey: ['category_members', categoryId],
+    queryFn: () => fetchCategoryMembers(categoryId!),
+    enabled: !!categoryId,
+  });
+}
+
+export function useRemoveMember(categoryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => removeUserFromCategory(categoryId, userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['category_members', categoryId] });
     },
   });
 }
