@@ -35,7 +35,6 @@ export function ShareCategoryModal({ category, isOpen, onClose }: ShareCategoryM
       {
         onSuccess: () => {
           setEmail('');
-          // No cerramos el modal para que veas que se agregó a la lista
         },
         onError: (err) => {
           setError(err instanceof Error ? err.message : 'Error al invitar');
@@ -48,38 +47,39 @@ export function ShareCategoryModal({ category, isOpen, onClose }: ShareCategoryM
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-[90vw] sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Share2 className="w-5 h-5" /> Compartir "{category.name}"
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <Share2 className="w-5 h-5 flex-shrink-0" /> 
+            <span className="truncate">Compartir "{category.name}"</span>
           </DialogTitle>
           <DialogDescription>
             Gestiona quién tiene acceso a esta categoría.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Lista de miembros actuales */}
-        <div className="space-y-3 py-4 border-b">
-          <Label>Usuarios con acceso</Label>
+        {/* Lista de miembros con scroll interno */}
+        <div className="space-y-3 py-2 flex-1 overflow-hidden flex flex-col min-h-0">
+          <Label className="flex-shrink-0">Usuarios con acceso</Label>
           {isLoadingMembers ? (
             <p className="text-sm text-muted-foreground">Cargando...</p>
           ) : (
-            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+            <div className="space-y-2 overflow-y-auto pr-2 pb-2">
               {members?.map((member) => (
                 <div key={member.user_id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm group">
                   <div className="flex items-center gap-2 truncate">
-                    <User className="w-4 h-4 text-muted-foreground" />
+                    <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     <span className="truncate">{member.email}</span>
                     {member.role === 'owner' && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider flex-shrink-0">
                         Dueño
                       </span>
                     )}
                   </div>
-                  {/* Solo mostrar el botón de eliminar si no es el dueño */}
+                  {/* Quitamos opacity-0 group-hover para que SIEMPRE sea visible */}
                   {member.role !== 'owner' && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0 ml-2"
                       onClick={() => {
                         if (confirm(`¿Quitar acceso a ${member.email}?`)) {
                           removeMutation.mutate(member.user_id);
@@ -87,7 +87,7 @@ export function ShareCategoryModal({ category, isOpen, onClose }: ShareCategoryM
                       }}
                       disabled={removeMutation.isPending}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
                 </div>
@@ -96,8 +96,8 @@ export function ShareCategoryModal({ category, isOpen, onClose }: ShareCategoryM
           )}
         </div>
 
-        {/* Formulario de invitación */}
-        <form onSubmit={handleInvite} className="space-y-4 pt-2">
+        {/* Formulario de invitación (Fijo abajo) */}
+        <form onSubmit={handleInvite} className="space-y-4 pt-4 border-t flex-shrink-0">
           <div className="space-y-2">
             <Label htmlFor="email">Invitar a un nuevo usuario</Label>
             <Input
