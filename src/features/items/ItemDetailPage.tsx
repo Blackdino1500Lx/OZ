@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItems, useUpdateItemStatus, useDeleteItem } from './hooks';
 import { NotesList } from '@/features/notes/NotesList';
+import { AttachmentsList } from '@/features/attachments/AttachmentsList';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -121,6 +122,9 @@ export function ItemDetailPage() {
         )}
       </div>
 
+      <NotesList itemId={item.id} />
+       <AttachmentsList itemId={item.id} />
+      
       <NotesList itemId={item.id} />
     </div>
   );
