@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { db } from '@/lib/db';
 import { processSyncQueue } from '@/lib/sync';
+import { syncWithGoogleCalendar } from '@/lib/google-calendar';
 import type { Item, Category, ItemStatus } from '@/types/database';
 
 export interface ItemWithCategory extends Item {
@@ -70,9 +71,21 @@ export async function createItem(item: Partial<Item>): Promise<Item> {
     kind: item.kind || 'tarea',
     all_day: item.all_day || false,
     origin: 'manual',
+    google_event_id: null,
   } as Item;
 
+  // 1. Sincronizar con Google Calendar (si está online y tiene fecha)
+  if (newItem.starts_at) {
+    const googleEventId = await syncWithGoogleCalendar('upsert', newItem);
+    if (googleEventId) {
+      newItem.google_event_id = googleEventId;
+    }
+  }
+
+  // 2. Guardar en IndexedDB
   await db.items.put(newItem);
+  
+  // 3. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'INSERT',
@@ -92,7 +105,6 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
   const updatedItem = { ...existing, ...updates, updated_at: new Date().toISOString() };
 
   // --- MOTOR DE RECURRENCIA ---
-  // Si la tarea pasa a "hecho" y tiene una regla de recurrencia, generamos la siguiente.
   const isBecomingDone = updates.status === 'hecho' && existing.status !== 'hecho';
   if (isBecomingDone && existing.recurrence_rule && existing.starts_at) {
     let nextDate = new Date(existing.starts_at);
@@ -104,15 +116,23 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
     else if (rule.includes('FREQ=MONTHLY')) nextDate.setMonth(nextDate.getMonth() + 1);
     else if (rule.includes('FREQ=YEARLY')) nextDate.setFullYear(nextDate.getFullYear() + 1);
 
+    // Creamos la nueva instancia para la próxima semana/mes
     const nextItem = {
       ...existing,
       id: crypto.randomUUID(),
       starts_at: nextDate.toISOString(),
       status: 'pendiente',
       completed_at: null,
+      google_event_id: null, // <-- El nuevo evento tendrá su propio ID
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     } as Item;
+
+    // Sincronizamos el futuro evento con Google
+    if (nextItem.starts_at) {
+      const googleEventId = await syncWithGoogleCalendar('upsert', nextItem);
+      if (googleEventId) nextItem.google_event_id = googleEventId;
+    }
 
     await db.items.put(nextItem);
     await db.sync_queue.add({
@@ -125,7 +145,19 @@ export async function updateItem(id: string, updates: Partial<Item>): Promise<It
   }
   // ----------------------------
 
+  // 1. Sincronizar el ítem actual con Google Calendar
+  if (updatedItem.starts_at) {
+    const googleEventId = await syncWithGoogleCalendar('upsert', updatedItem);
+    // Si Google nos devuelve un ID y no lo teníamos, lo guardamos
+    if (googleEventId && !updatedItem.google_event_id) {
+      updatedItem.google_event_id = googleEventId;
+    }
+  }
+
+  // 2. Guardar local
   await db.items.put(updatedItem);
+  
+  // 3. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'UPDATE',
@@ -154,14 +186,28 @@ export async function softDeleteItem(id: string): Promise<void> {
   const existing = await db.items.get(id);
   if (!existing) return;
 
-  const updated = { ...existing, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  // 1. Borrar de Google Calendar
+  if (existing.google_event_id) {
+    await syncWithGoogleCalendar('delete', existing);
+  }
+
+  // 2. Soft delete local
+  const updated = { 
+    ...existing, 
+    deleted_at: new Date().toISOString(), 
+    updated_at: new Date().toISOString() 
+  };
   await db.items.put(updated);
 
+  // 3. Encolar para Supabase
   await db.sync_queue.add({
     table: 'items',
     action: 'DELETE',
     recordId: id,
-    payload: { deleted_at: updated.deleted_at, updated_at: updated.updated_at },
+    payload: { 
+      deleted_at: updated.deleted_at, 
+      updated_at: updated.updated_at 
+    },
     createdAt: Date.now(),
   });
 

@@ -39,6 +39,7 @@ export interface Item {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  google_event_id: string | null; 
 }
 
 export interface ItemNote {
