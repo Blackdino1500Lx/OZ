@@ -122,9 +122,8 @@ export function ItemDetailPage() {
         )}
       </div>
 
-      <NotesList itemId={item.id} />
-       <AttachmentsList itemId={item.id} />
-      
+      {/* Aquí están los componentes, solo una vez cada uno */}
+      <AttachmentsList itemId={item.id} />
       <NotesList itemId={item.id} />
     </div>
   );
