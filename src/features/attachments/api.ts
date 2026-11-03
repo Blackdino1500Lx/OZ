@@ -1,19 +1,27 @@
 import { supabase } from '@/lib/supabase';
 import type { ItemAttachment } from '@/types/database';
 
-export async function fetchAttachments(itemId: string): Promise<ItemAttachment[]> {
-  const { data, error } = await supabase
+export async function fetchAttachments(itemId: string, noteId?: string): Promise<ItemAttachment[]> {
+  let query = supabase
     .from('item_attachments')
     .select('*')
     .eq('item_id', itemId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
+  // Si pasamos un noteId, filtramos por esa nota. Si no, solo los generales (note_id is null)
+  if (noteId) {
+    query = query.eq('note_id', noteId);
+  } else {
+    query = query.is('note_id', null);
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data as ItemAttachment[]) || [];
 }
 
-export async function uploadAttachment(itemId: string, file: File): Promise<ItemAttachment> {
+export async function uploadAttachment(itemId: string, file: File, noteId?: string): Promise<ItemAttachment> {
   if (!navigator.onLine) {
     throw new Error('Necesitás conexión a internet para subir archivos.');
   }
@@ -24,28 +32,25 @@ export async function uploadAttachment(itemId: string, file: File): Promise<Item
   const userId = session.user.id;
   const fileExt = file.name.split('.').pop();
   const fileName = `${crypto.randomUUID()}.${fileExt}`;
-  // La ruta debe empezar con el user_id para que las políticas de Storage funcionen
   const filePath = `${userId}/${fileName}`;
 
-  // 1. Subir archivo a Storage
   const { error: uploadError } = await supabase.storage
     .from('attachments')
     .upload(filePath, file);
 
   if (uploadError) throw new Error(uploadError.message);
 
-  // 2. Obtener URL pública (o firmada, como el bucket es privado, usamos URL firmada)
   const { data: urlData, error: urlError } = await supabase.storage
     .from('attachments')
-    .createSignedUrl(filePath, 60 * 60 * 24 * 365); // Válida por 1 año
+    .createSignedUrl(filePath, 60 * 60 * 24 * 365);
 
   if (urlError || !urlData) throw new Error('No se pudo obtener la URL del archivo');
 
-  // 3. Guardar registro en la base de datos
   const { data, error } = await supabase
     .from('item_attachments')
     .insert([{
       item_id: itemId,
+      note_id: noteId || null, // <-- Guardamos a qué nota pertenece
       file_name: file.name,
       file_url: urlData.signedUrl,
       file_type: file.type
@@ -64,5 +69,4 @@ export async function deleteAttachment(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw new Error(error.message);
-  // Nota: No borramos el archivo físico del Storage para evitar problemas, solo el registro lógico.
 }

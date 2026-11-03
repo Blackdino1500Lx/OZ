@@ -53,6 +53,7 @@ export interface ItemNote {
 export interface ItemAttachment {
   id: string;
   item_id: string;
+  note_id: string | null;
   user_id: string;
   file_name: string;
   file_url: string;

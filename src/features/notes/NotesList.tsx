@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { NoteAttachments } from '@/features/attachments/NoteAttachments'; // <-- NUEVO IMPORT
 
 export function NotesList({ itemId }: { itemId: string }) {
   const { data: notes, isLoading } = useNotes(itemId);
@@ -41,7 +42,6 @@ export function NotesList({ itemId }: { itemId: string }) {
     <div className="space-y-6 mt-8">
       <h3 className="font-semibold text-lg border-b pb-2">Seguimiento</h3>
 
-      {/* Timeline */}
       <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
         {notes?.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-4">No hay notas todavía.</p>
@@ -49,7 +49,6 @@ export function NotesList({ itemId }: { itemId: string }) {
         
         {notes?.map((note) => (
           <div key={note.id} className="relative pl-6">
-            {/* Timeline dot */}
             <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-primary ring-4 ring-background" />
             
             {editingId === note.id ? (
@@ -84,7 +83,7 @@ export function NotesList({ itemId }: { itemId: string }) {
                     <span className="text-muted-foreground">•</span>
                     <button
                       onClick={() => {
-                        if (confirm('¿Borrar esta nota?')) deleteMutation.mutate(note.id);
+                        if (confirm('¿Borrar esta nota y sus adjuntos?')) deleteMutation.mutate(note.id);
                       }}
                       className="text-xs text-destructive hover:text-destructive/80 underline"
                     >
@@ -93,13 +92,16 @@ export function NotesList({ itemId }: { itemId: string }) {
                   </div>
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{note.body}</p>
+                
+                {/* COMPONENTE DE ADJUNTOS DE LA NOTA */}
+                <NoteAttachments itemId={itemId} noteId={note.id} />
+                
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Add note form */}
       <form onSubmit={handleCreate} className="bg-muted/30 p-4 rounded-lg border mt-4">
         <Textarea
           placeholder="Agregar una nota de seguimiento..."

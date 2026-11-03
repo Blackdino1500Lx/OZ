@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAttachments, uploadAttachment, deleteAttachment } from './api';
 
-export function useAttachments(itemId: string) {
+export function useAttachments(itemId: string, noteId?: string) {
   return useQuery({
-    queryKey: ['attachments', itemId],
-    queryFn: () => fetchAttachments(itemId),
+    queryKey: ['attachments', itemId, noteId],
+    queryFn: () => fetchAttachments(itemId, noteId),
     enabled: !!itemId,
   });
 }
@@ -12,8 +12,9 @@ export function useAttachments(itemId: string) {
 export function useUploadAttachment(itemId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => uploadAttachment(itemId, file),
+    mutationFn: ({ file, noteId }: { file: File; noteId?: string }) => uploadAttachment(itemId, file, noteId),
     onSuccess: () => {
+      // Invalidamos todas las queries de adjuntos para este ítem
       void queryClient.invalidateQueries({ queryKey: ['attachments', itemId] });
     },
   });
