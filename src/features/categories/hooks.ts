@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { inviteUserToCategory } from './api';
 import { 
   fetchCategories, createCategory, updateCategory, softDeleteCategory, swapCategoriesOrder 
 } from './api';
@@ -45,6 +46,16 @@ export function useSwapCategories() {
   return useMutation({
     mutationFn: ({ id1, order1, id2, order2 }: { id1: string; order1: number; id2: string; order2: number }) =>
       swapCategoriesOrder(id1, order1, id2, order2),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+}
+export function useInviteToCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ categoryId, email }: { categoryId: string; email: string }) =>
+      inviteUserToCategory(categoryId, email),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
     },

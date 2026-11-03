@@ -109,3 +109,10 @@ export async function softDeleteCategory(id: string): Promise<void> {
 
   void processSyncQueue();
 }
+export async function inviteUserToCategory(categoryId: string, email: string): Promise<void> {
+  const { error } = await supabase.rpc('invite_to_category', {
+    cat_id: categoryId,
+    invite_email: email,
+  });
+  if (error) throw new Error(error.message);
+}

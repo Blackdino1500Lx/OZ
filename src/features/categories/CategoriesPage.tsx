@@ -8,9 +8,11 @@ import {
 } from './hooks';
 import { useItems } from '@/features/items/hooks';
 import { CategoryForm } from './CategoryForm';
+import { ShareCategoryModal } from './ShareCategoryModal'; // <-- NUEVO
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { type Category } from '@/types/database';
+import { Share2 } from 'lucide-react'; // <-- NUEVO
 
 const DEFAULT_CATEGORIES = [
   { name: 'Trabajo', color: '#3B82F6', sort_order: 1 },
@@ -20,18 +22,20 @@ const DEFAULT_CATEGORIES = [
 
 export function CategoriesPage() {
   const { data: categories, isLoading } = useCategories();
-  const { data: items } = useItems(); // Traemos los ítems para validar el borrado
+  const { data: items } = useItems();
   
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
   const deleteMutation = useDeleteCategory();
-  const swapMutation = useSwapCategories(); // Hook para el intercambio de orden
+  const swapMutation = useSwapCategories();
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hasSeeded, setHasSeeded] = useState(false);
+  
+  // Estado para el modal de compartir
+  const [sharingCategory, setSharingCategory] = useState<Category | null>(null);
 
-  // Crear categorías por defecto en el primer ingreso
   useEffect(() => {
     if (!isLoading && categories && categories.length === 0 && !hasSeeded && !createMutation.isPending) {
       setHasSeeded(true);
@@ -56,7 +60,6 @@ export function CategoriesPage() {
     );
   };
 
-  // Arreglo del bug: usamos swapMutation para hacer el intercambio en un solo paso
   const moveCategory = (category: Category, direction: 'up' | 'down') => {
     if (!categories) return;
     const index = categories.findIndex((c) => c.id === category.id);
@@ -76,7 +79,6 @@ export function CategoriesPage() {
     }
   };
 
-  // Validación para no borrar categorías con ítems asociados
   const handleDelete = (category: Category) => {
     const hasItems = items?.some((item) => item.category_id === category.id);
     
@@ -131,12 +133,21 @@ export function CategoriesPage() {
                   <span className="flex-1 font-medium">{category.name}</span>
                   
                   <div className="flex items-center gap-1 text-muted-foreground">
+                    {/* Botón de Compartir */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSharingCategory(category)}
+                      title="Compartir categoría"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+
                     <Button
                       variant="ghost"
                       size="icon"
                       disabled={index === 0 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'up')}
-                      title="Subir"
                     >
                       ↑
                     </Button>
@@ -145,7 +156,6 @@ export function CategoriesPage() {
                       size="icon"
                       disabled={index === (categories?.length ?? 0) - 1 || swapMutation.isPending}
                       onClick={() => moveCategory(category, 'down')}
-                      title="Bajar"
                     >
                       ↓
                     </Button>
@@ -167,13 +177,16 @@ export function CategoriesPage() {
             )}
           </div>
         ))}
-        
-        {categories?.length === 0 && !isCreating && (
-          <p className="text-center text-muted-foreground py-8">
-            No hay categorías. Creá una para empezar.
-          </p>
-        )}
       </div>
+
+      {/* Modal de compartir */}
+      {sharingCategory && (
+        <ShareCategoryModal
+          category={sharingCategory}
+          isOpen={!!sharingCategory}
+          onClose={() => setSharingCategory(null)}
+        />
+      )}
     </div>
   );
 }
