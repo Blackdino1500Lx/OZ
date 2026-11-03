@@ -6,6 +6,7 @@ export function useNotes(itemId: string) {
     queryKey: ['notes', itemId],
     queryFn: () => fetchNotes(itemId),
     enabled: !!itemId,
+    refetchOnWindowFocus: true, // Refresca las notas al volver a la pestaña
   });
 }
 

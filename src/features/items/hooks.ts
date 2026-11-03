@@ -6,6 +6,8 @@ export function useItems() {
   return useQuery({
     queryKey: ['items'],
     queryFn: fetchItems,
+    refetchOnWindowFocus: true, // Refresca al volver a la pestaña
+    refetchInterval: 10000,     // Refresca cada 10 segundos
   });
 }
 

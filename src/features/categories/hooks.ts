@@ -1,12 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { inviteUserToCategory } from './api';
 import { 
-  fetchCategories, createCategory, updateCategory, softDeleteCategory, swapCategoriesOrder 
+  fetchCategories, 
+  createCategory, 
+  updateCategory, 
+  softDeleteCategory, 
+  swapCategoriesOrder,
+  inviteUserToCategory
 } from './api';
+
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
     queryFn: fetchCategories,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   });
 }
 
@@ -41,6 +48,7 @@ export function useDeleteCategory() {
     },
   });
 }
+
 export function useSwapCategories() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -51,6 +59,7 @@ export function useSwapCategories() {
     },
   });
 }
+
 export function useInviteToCategory() {
   const queryClient = useQueryClient();
   return useMutation({
